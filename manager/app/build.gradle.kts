@@ -1,5 +1,7 @@
 @file:Suppress("UnstableApiUsage")
 
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.agp.app)
     alias(libs.plugins.androidx.baselineprofile)
@@ -21,6 +23,33 @@ val managerVersionCode = rootProject.extra["managerVersionCode"] as Int
 val managerVersionName = rootProject.extra["managerVersionName"] as String
 val managerPackageName = rootProject.extra["managerPackageName"] as String
 val managerName = rootProject.extra["managerName"] as String
+
+// ---- 签名配置 --------------------------------------------------------------
+// 口令不写死在构建脚本里，统一从仓库根的 signing.properties 读取（该文件不入库）。
+// 优先级：-P 命令行参数 > signing.properties > 环境变量（CI 用）。
+val signingProps = Properties().apply {
+    listOf(rootProject.file("../signing.properties"), rootProject.file("signing.properties"))
+        .firstOrNull { it.isFile }
+        ?.inputStream()
+        ?.use { load(it) }
+}
+
+fun signingValue(key: String): String? {
+    val fromCli = (project.findProperty(key) as String?)?.takeIf { it.isNotBlank() }
+    if (fromCli != null) return fromCli
+    val fromFile = signingProps.getProperty(key)?.trim()?.takeIf { it.isNotEmpty() }
+    if (fromFile != null) return fromFile
+    return System.getenv(key)?.takeIf { it.isNotBlank() }
+}
+
+// 密钥库路径允许写相对仓库根的路径；apksign 插件需要绝对路径。
+signingValue("KEYSTORE_FILE")?.let { raw ->
+    val resolved = if (raw.startsWith("/")) file(raw) else rootProject.file("../$raw")
+    extensions.extraProperties.set("KEYSTORE_FILE", resolved.absolutePath)
+}
+listOf("KEYSTORE_PASSWORD", "KEY_ALIAS", "KEY_PASSWORD").forEach { key ->
+    signingValue(key)?.let { extensions.extraProperties.set(key, it) }
+}
 
 apksign {
     storeFileProperty = "KEYSTORE_FILE"

@@ -1,0 +1,13 @@
+# ---------------------------------------------------------------------------
+# 打包签名配置模板
+#
+# 复制成 signing.properties 后填入真实值（该文件已被 .gitignore 排除，不会入库）：
+#   cp signing.properties.example signing.properties
+#
+# 也可以用环境变量覆盖，适合 CI：
+#   KEYSTORE_FILE / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD
+# ---------------------------------------------------------------------------
+KEYSTORE_FILE=/absolute/path/to/release.jks
+KEYSTORE_PASSWORD=change_me
+KEY_ALIAS=change_me
+KEY_PASSWORD=change_me

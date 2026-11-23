@@ -20,14 +20,25 @@
 
 ## 二、签名
 
-通过 `apksign` 插件，从 Gradle 属性读取：
+口令不再写死在构建脚本里，统一放在仓库根的 **`signing.properties`**（已在 `.gitignore` 中排除，不入库）。模板见 `signing.properties.example`：
 
-| 属性 | 说明 |
+```bash
+cp signing.properties.example signing.properties   # 首次使用
+```
+
+| 键 | 说明 |
 |---|---|
-| `KEYSTORE_FILE` | 密钥库路径 |
+| `KEYSTORE_FILE` | 密钥库路径，可写绝对路径或相对仓库根的路径 |
 | `KEYSTORE_PASSWORD` | 密钥库口令 |
 | `KEY_ALIAS` | 密钥别名 |
 | `KEY_PASSWORD` | 密钥口令 |
+
+两种构建方式都会自动读取这份文件：
+
+- `scripts/release-apk.sh`：解析后以 `-P` 传给 Gradle，密钥库不存在时直接报错退出；
+- `cd manager && ./gradlew :app:assembleRelease`：`app/build.gradle.kts` 在配置阶段加载并注入属性。
+
+覆盖顺序：`-P` 命令行参数 > `signing.properties` > 环境变量（同名，CI 场景用）。改密钥或换机器只改这一个文件，脚本和 Gradle 都不用动。
 
 > **签名方案必须为纯 v2（无 v1 / v3）。** 启用 v3 会导致动态管理器功能失效。
 

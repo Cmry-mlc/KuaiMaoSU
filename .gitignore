@@ -24,6 +24,7 @@ captures/
 *.keystore
 local.properties
 key.jks
+signing.properties
 
 # ---- 内核编译中间件 ----
 /userspace/ksud/.lkm_image_bootstrap.o

@@ -30,6 +30,45 @@ export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$TC/aarch64-linux-android26-cla
 
 say() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 
+# ---- 0. 签名配置 ----------------------------------------------------------
+# 口令与密钥路径集中放在仓库根 signing.properties（不入库，见 .gitignore）。
+# 优先级：环境变量 > signing.properties > 空（交给 Gradle 自己读同一份文件）。
+SIGN_PROPS=$REPO/signing.properties
+sign_prop() {
+  local key=$1 v=""
+  v=$(printenv "$key" 2>/dev/null || true)
+  if [ -z "$v" ] && [ -f "$SIGN_PROPS" ]; then
+    v=$(awk -v k="$key" 'BEGIN{FS="="} $1==k { sub(/^[^=]*=/, ""); gsub(/\r/, ""); print; exit }' "$SIGN_PROPS")
+  fi
+  printf '%s' "$v"
+}
+
+KS_FILE=$(sign_prop KEYSTORE_FILE)
+KS_PASS=$(sign_prop KEYSTORE_PASSWORD)
+KS_ALIAS=$(sign_prop KEY_ALIAS)
+KS_KEYPASS=$(sign_prop KEY_PASSWORD)
+
+case "$KS_FILE" in
+  "") ;;
+  /*) ;;
+  *) KS_FILE=$REPO/$KS_FILE ;;
+esac
+if [ -n "$KS_FILE" ] && [ ! -f "$KS_FILE" ]; then
+  echo "找不到密钥库: $KS_FILE" >&2
+  echo "请检查 $SIGN_PROPS 里的 KEYSTORE_FILE" >&2
+  exit 1
+fi
+SIGN_ARGS=()
+[ -n "$KS_FILE" ] && SIGN_ARGS+=("-PKEYSTORE_FILE=$KS_FILE")
+[ -n "$KS_PASS" ] && SIGN_ARGS+=("-PKEYSTORE_PASSWORD=$KS_PASS")
+[ -n "$KS_ALIAS" ] && SIGN_ARGS+=("-PKEY_ALIAS=$KS_ALIAS")
+[ -n "$KS_KEYPASS" ] && SIGN_ARGS+=("-PKEY_PASSWORD=$KS_KEYPASS")
+if [ -n "$KS_FILE" ]; then
+  say "签名: $KS_FILE (alias=$KS_ALIAS)"
+else
+  echo "警告: 未找到签名配置 ($SIGN_PROPS)，构建产物可能未签名" >&2
+fi
+
 # ---- 1. 取 ko -------------------------------------------------------------
 KO=${KO:-$REPO/../susfs-out/${KMI}_susfs_guard_lkm.ko}
 [ -f "$KO" ] || { echo "找不到 ko: $KO（用 KO=... 指定）" >&2; exit 1; }
@@ -92,10 +131,7 @@ say "版本: $VN ($VC)"
 say "assembleRelease (JAVA_HOME=$JAVA_HOME, $(java -version 2>&1 | head -1))"
 cd "$REPO/manager"
 ./gradlew :app:assembleRelease --no-daemon --no-parallel --max-workers=2 \
-  -PKEYSTORE_FILE=/workspace/loomsu-release.jks \
-  -PKEYSTORE_PASSWORD=loomsu123456 \
-  -PKEY_ALIAS=loomsu \
-  -PKEY_PASSWORD=loomsu123456 \
+  ${SIGN_ARGS[@]+"${SIGN_ARGS[@]}"} \
   -Dorg.gradle.jvmargs="-Xmx2560m -XX:MaxMetaspaceSize=768m" \
   -Dkotlin.daemon.jvmargs="-Xmx1024m" \
   | tail -5
