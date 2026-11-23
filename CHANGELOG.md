@@ -2,6 +2,11 @@
 
 本项目以 GPL-3.0 发布，下面的记录同时充当「相对上游 BakaSU 改了什么」的说明。
 
+## 4.3.21
+
+- **移除内置 Zygisk 引擎**：删除 FolkZygisk（ReZygisk / CSOLoader / PLTI）全部源码、预编译资产与构建脚本，`ksud` 不再内嵌 `zygisk` 子命令，管理器移除「内置Zygisk」入口与引擎页，致谢页与修改清单同步清理。需要 Zygisk 的场景改用外部模块（zygisksu / rezygisk），主页仍会显示检测到的外部实现。
+- **修复 SUSFS 自伤导致的开机闪退**：不再把管理器自己的 `base.apk` 自动写进 `sus_path`；下发时硬过滤该路径；历史上已写入的条目会在 `boot_completed` 与免解 `late_load` 两条路径上自动清理。原因是内核该构建 `ignore_ksu_allowlist = true`，会对 `uid >= 10000` 全量隐藏，管理器打开自身 APK 被判 `-ENOENT`，进程在 `Application.onCreate` 之前即终止。
+
 ## 4.1.3
 
 - **模块备份**：模块卡底部删除按钮左侧新增「备份」按钮，与删除共享一块圆角底（同标题栏通知+重启风格）。点击后用 busybox tar 打包该模块目录（保留 symlink/权限）到 `/storage/emulated/0/Download/KuaiMao_<模块名>_<时间戳>.tar.gz`，结果以 snackbar 提示。

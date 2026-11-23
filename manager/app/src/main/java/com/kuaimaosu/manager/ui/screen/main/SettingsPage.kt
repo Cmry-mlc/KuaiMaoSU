@@ -191,9 +191,9 @@ fun SettingsPage(bottomPadding: Dp) {
             route = Route.SettingsRoot,
         ),
         KuaiMaoCategory(
-            title = "eBPF 控制台",
-            summary = "目录项过滤 · /proc 表屏蔽 · 进程隐身",
-            count = 3,
+            title = "内核隐藏",
+            summary = "目录项 · stat · 进程 · maps · 符号表",
+            count = 5,
             icon = Icons.TwoTone.VisibilityOff,
             tone = KuaiMaoTones.violet,
             route = Route.AceHide,
@@ -253,14 +253,6 @@ fun SettingsPage(bottomPadding: Dp) {
             icon = Icons.TwoTone.Layers,
             tone = KuaiMaoTones.blue,
             route = Route.MountController,
-        ),
-        KuaiMaoCategory(
-            title = "内置Zygisk",
-            summary = "无需模块的 Zygisk",
-            count = 3,
-            icon = Icons.TwoTone.Bolt,
-            tone = KuaiMaoTones.amber,
-            route = Route.ZygiskEngine,
         ),
         KuaiMaoCategory(
             title = "一键越狱",

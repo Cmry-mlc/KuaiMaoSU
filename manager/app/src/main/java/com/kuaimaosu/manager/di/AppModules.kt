@@ -54,7 +54,6 @@ import com.kuaimaosu.manager.data.susfs.SuSFSConfigHelper
 import com.kuaimaosu.manager.data.susfs.SuSFSRepository
 import com.kuaimaosu.manager.data.mount.MountRepository
 import com.kuaimaosu.manager.data.susfs.SusfsLkmRepository
-import com.kuaimaosu.manager.data.zygisk.ZygiskRepository
 import com.kuaimaosu.manager.data.system.HomeRuntimeRepository
 import com.kuaimaosu.manager.data.system.HomeStateRepository
 import com.kuaimaosu.manager.data.text.HanziToPinyin
@@ -309,7 +308,6 @@ val repositoryModule = module {
     singleOf(::SuSFSRepository)
     singleOf(::SusfsLkmRepository)
     single { AceHideRepository(androidApplication(), get()) }
-    singleOf(::ZygiskRepository)
     singleOf(::MountRepository)
     singleOf(::MonetCompatColorSource)
     singleOf(::ThemeRepository)

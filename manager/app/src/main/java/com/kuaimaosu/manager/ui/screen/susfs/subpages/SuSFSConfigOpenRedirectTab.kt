@@ -1,5 +1,7 @@
 package com.kuaimaosu.manager.ui.screen.susfs.subpages
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.twotone.Link
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,6 +30,7 @@ import com.kuaimaosu.manager.domain.model.OpenRedirectItem
 import com.kuaimaosu.manager.domain.model.UidScheme
 import com.kuaimaosu.manager.ui.component.settings.SettingsDropdownWidget
 import com.kuaimaosu.manager.ui.component.settings.SettingsJumpPageWidget
+import com.kuaimaosu.manager.ui.screen.susfs.component.SusfsEntryRow
 import com.kuaimaosu.manager.ui.component.settings.SettingsTextFieldWidget
 import com.kuaimaosu.manager.ui.screen.susfs.RegisterSuSFSRefresh
 import com.kuaimaosu.manager.ui.screen.susfs.SuSFSRefreshRegistrar
@@ -128,9 +131,9 @@ fun OpenRedirectTab(
             entryKey = { "${it.target_path}|${it.redirected_path}|${it.uid_scheme.value}" },
             onAddEntry = { showManualAdd = true },
         ) { item ->
-            SettingsJumpPageWidget(
-                iconPlaceholder = false,
+            SusfsEntryRow(
                 title = item.target_path,
+                icon = Icons.TwoTone.Link,
                 description = stringResource(
                     R.string.susfs_redirect_entry_description,
                     item.redirected_path,

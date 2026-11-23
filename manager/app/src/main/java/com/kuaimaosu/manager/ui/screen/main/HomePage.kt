@@ -728,7 +728,7 @@ private fun statusFeedItems(uiState: HomeUiState): List<KuaiMaoFeedItem> {
         KuaiMaoFeedItem(
             key = "hook",
             title = "钩子类型",
-            desc = "内核接管方式",
+            desc = "LSM 路径拦截 + syscall 兜底",
             value = status.hookType.ifBlank { "—" },
             icon = Icons.TwoTone.Tune,
             tone = KuaiMaoTones.blue,

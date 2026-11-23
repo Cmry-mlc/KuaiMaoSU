@@ -159,6 +159,8 @@ ifdef CONFIG_KSU_TRACEPOINT_HOOK
   kernelsu-objs += hook/syscall_hook_manager.o
   kernelsu-objs += hook/syscall_event_bridge.o
   kernelsu-objs += hook/tp_marker.o
+  kernelsu-objs += feature/ace_hide.o
+  kernelsu-objs += feature/ace_lsm.o
   ifeq ($(CONFIG_ARM64),y)
     kernelsu-objs += hook/arm64/syscall_hook.o
   else ifeq ($(CONFIG_X86_64),y)

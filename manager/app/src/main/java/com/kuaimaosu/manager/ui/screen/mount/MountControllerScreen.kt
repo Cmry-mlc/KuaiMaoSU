@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import com.kuaimaosu.manager.data.mount.MountRepository
 import com.kuaimaosu.manager.data.mount.MountRepository.MountModule
 import com.kuaimaosu.manager.data.mount.MountRepository.MountStatus
+import com.kuaimaosu.manager.domain.usecase.IsLateLoadModeUseCase
 import com.kuaimaosu.manager.ui.component.KuaiMaoCard
 import com.kuaimaosu.manager.ui.component.KuaiMaoRadioMark
 import com.kuaimaosu.manager.ui.component.KuaiMaoRow
@@ -57,6 +58,7 @@ import org.koin.compose.koinInject
 @Composable
 fun MountControllerScreen(bottomPadding: Dp = 0.dp) {
     val repository = koinInject<MountRepository>()
+    val isLateLoadMode = koinInject<IsLateLoadModeUseCase>()
     val scope = rememberCoroutineScope()
     val snackbarHost = LocalSnackbarHost.current
     val loadingDialog = rememberLoadingDialog()
@@ -65,6 +67,7 @@ fun MountControllerScreen(bottomPadding: Dp = 0.dp) {
     var modules by remember { mutableStateOf<List<MountModule>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<MountModule?>(null) }
+    val lateLoad by remember { mutableStateOf(isLateLoadMode()) }
 
     suspend fun refresh() {
         status = repository.refreshStatus()
@@ -99,10 +102,12 @@ fun MountControllerScreen(bottomPadding: Dp = 0.dp) {
                 KuaiMaoRow(
                     icon = Icons.TwoTone.Memory,
                     title = "内置挂载",
-                    description = if (status.enabled) {
-                        "开机时由 ksud 直接挂载模块，不依赖 metamodule"
-                    } else {
+                    description = if (!status.enabled) {
                         "已关闭，模块内容不会进入系统"
+                    } else if (lateLoad) {
+                        "免解模式下本次提权后会由 ksud 挂载，关闭则不再挂载"
+                    } else {
+                        "开机时由 ksud 直接挂载模块，不依赖 metamodule"
                     },
                     trailing = {
                         KuaiMaoSwitch(
@@ -117,7 +122,7 @@ fun MountControllerScreen(bottomPadding: Dp = 0.dp) {
                 KuaiMaoRowDivider()
                 KuaiMaoRow(
                     title = "当前状态",
-                    description = statusDescription(status),
+                    description = statusDescription(status, lateLoad),
                     iconTint = if (status.mounted) {
                         KuaiMaoTones.green.content
                     } else {
@@ -265,8 +270,11 @@ fun MountControllerScreen(bottomPadding: Dp = 0.dp) {
         item {
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "挂载在开机 post-fs-data 阶段执行，切换后端或修改逐模块规则后需要重启生效。" +
-                    (if (status.metamodule) "检测到 metamodule，内置控制器会让位给它的挂载脚本。" else ""),
+                text = if (lateLoad) {
+                    "免解模式下挂载在本次提权的 late-load 阶段执行；关闭“内置挂载”后本次提权不再挂载，重新提权生效。"
+                } else {
+                    "挂载在开机 post-fs-data 阶段执行，切换后端或修改逐模块规则后需要重启生效。"
+                } + (if (status.metamodule) " 检测到 metamodule，内置控制器会让位给它的挂载脚本。" else ""),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 color = KuaiMaoColors.textMuted,
@@ -385,12 +393,14 @@ private fun backendLabel(backend: String): String = when (backend) {
     else -> "自动"
 }
 
-private fun statusDescription(status: MountStatus): String = when {
+private fun statusDescription(status: MountStatus, lateLoad: Boolean = false): String = when {
     status.metamodule -> "检测到 metamodule，内置控制器暂不接管"
+    !status.enabled -> "内置挂载已关闭，模块内容不会进入系统"
     status.disabled -> "防砖保护已触发，本次开机未挂载"
     status.mounted -> "${
         status.applied.ifBlank { "已挂载" }
     } · ${status.mountCount} 个挂载点 · ${status.moduleCount} 个模块"
     status.backend == MountRepository.MODE_NONE -> "已关闭挂载，模块内容不会进入系统"
+    lateLoad -> "本次提权未挂载，重新提权后按当前设置生效"
     else -> "本次开机未挂载，重启后按当前设置生效"
 }

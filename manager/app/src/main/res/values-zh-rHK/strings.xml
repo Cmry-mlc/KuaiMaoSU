@@ -547,4 +547,13 @@
     <string name="require_manager_version">需要更新管理器</string>
     <string name="require_kernel_version">需要更新內核。撳一下嚟安裝。</string>
     <string name="require_kernel_version_gki">需要更新內核</string>
+    <string name="susfs_general_eyebrow">SUSFS · GENERAL</string>
+    <string name="susfs_general_state_on">偽裝生效中</string>
+    <string name="susfs_general_state_off">全部關閉</string>
+    <string name="susfs_general_group_audit">審計與日誌</string>
+    <string name="susfs_general_group_mount">掛載可見性</string>
+    <string name="susfs_general_group_identity">內核標識</string>
+    <string name="susfs_general_note_debug">僅在排查時開啟</string>
+    <string name="susfs_general_note_persist">重啟後仍生效</string>
+    <string name="susfs_general_footer">呢啲開關直接寫 /proc/susfs_config，改完即刻生效；日誌會落到 logcat 嘅 susfs 標籤。</string>
 </resources>

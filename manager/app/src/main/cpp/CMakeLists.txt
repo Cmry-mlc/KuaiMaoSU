@@ -11,6 +11,7 @@ add_library(guava
         jni.c
         ksu.c
         legacy.c
+        boot_trace_native.c
 )
 
 target_include_directories(guava PRIVATE .)

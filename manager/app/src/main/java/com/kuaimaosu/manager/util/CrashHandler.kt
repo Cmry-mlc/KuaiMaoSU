@@ -32,6 +32,11 @@ object CrashHandler {
                     File(dir, FILE_NAME).writeText(report)
                 }
             }
+            // 同一份崩溃写进启动打点，便于在 boot_trace.txt 里看到完整链路
+            runCatching {
+                BootTrace.bindContext(appContext)
+                BootTrace.markThrowable("UNCAUGHT EXCEPTION on thread ${thread.name}", throwable)
+            }
             previous?.uncaughtException(thread, throwable)
         }
     }

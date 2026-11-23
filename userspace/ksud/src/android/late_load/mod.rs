@@ -133,6 +133,22 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
     if let Err(e) = metamodule::exec_mount_script(defs::MODULE_DIR) {
         warn!("execute metamodule mount failed: {e}");
     }
+
+    // 10.5 内置挂载控制器：免解（late-load）下也执行一次挂载。
+    // 免解处于 boot_completed=1，没有真正的 post-fs-data 阶段，正常的
+    // mount::apply 会拒绝运行；这里走专用入口，只尊重“内置挂载”总开关，
+    // 不写开机防砖计数。装了 metamodule 时 apply_late_load 内部会让位，
+    // 避免和上面的元模块脚本重复挂载。
+    match crate::android::mount::apply_late_load() {
+        Ok(report) => info!("built-in mount (late-load): {} - {}", report.ok, report.detail),
+        Err(e) => warn!("built-in mount (late-load) failed: {e:#}"),
+    }
+
+    // 10.6 免解不会走 susfs::on_boot_completed()（这里只跑 boot-completed 脚本，
+    // 不执行 Rust 侧下发），所以历史版本自动注册的管理器 base.apk sus_path
+    // 必须在这里清一次并落盘，否则配置脏数据会一直留着，等下次开机下发即崩。
+    crate::android::susfs::init_event::prune_manager_apk_entries();
+
     // 11. Execute dynamic manager booted load
     if let Err(e) = dynamic_manager::booted_load() {
         warn!("set dynamic manager failed: {e}");

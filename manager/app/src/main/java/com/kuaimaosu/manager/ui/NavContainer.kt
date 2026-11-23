@@ -114,7 +114,6 @@ import com.kuaimaosu.manager.ui.screen.susfs.SuSFSConfigScreen
 import com.kuaimaosu.manager.ui.screen.susfs.SuSFSLkmScreen
 import com.kuaimaosu.manager.ui.screen.acehide.AceHideScreen
 import com.kuaimaosu.manager.ui.screen.themeSettings.ThemeSettingsScreen
-import com.kuaimaosu.manager.ui.screen.zygisk.ZygiskScreen
 import com.kuaimaosu.manager.ui.screen.kuaimao.KuaiMaoRootScreen
 import com.kuaimaosu.manager.ui.theme.BackgroundRenderState
 import com.kuaimaosu.manager.ui.theme.BackgroundManager
@@ -789,17 +788,6 @@ fun NavContainer(
                     useBlur = useBlur,
                 ) {
                     MountControllerScreen()
-                }
-            }
-            entry<Route.ZygiskEngine>(swipeDismiss = swipeBackDirection) {
-                ManagerNavEntry(
-                    interceptPredictiveBack = interceptPredictiveBack,
-                    onBack = onBack,
-                    themeConfig = themeConfig,
-                    backgroundRenderState = backgroundRenderState,
-                    useBlur = useBlur,
-                ) {
-                    ZygiskScreen()
                 }
             }
             entry<Route.KuaiMaoRoot>(swipeDismiss = swipeBackDirection) {

@@ -46,6 +46,7 @@ import com.kuaimaosu.manager.ui.viewmodel.ModuleViewModel
 import com.kuaimaosu.manager.ui.viewmodel.SettingsUiAction
 import com.kuaimaosu.manager.ui.viewmodel.SettingsUiEvent
 import com.kuaimaosu.manager.ui.viewmodel.SettingsViewModel
+import com.kuaimaosu.manager.util.BootTrace
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
@@ -72,18 +73,22 @@ class MainActivity : ComponentActivity() {
     private val intentChannel = Channel<Intent>(capacity = Channel.BUFFERED)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        BootTrace.mark("MainActivity.onCreate enter (savedInstanceState=${savedInstanceState != null})")
         try {
             // 只保留 Compose 动画首屏：系统启动窗口立即交棒，不再停留成第一屏。
             installSplashScreen()
+            BootTrace.mark("MainActivity installSplashScreen done")
 
             // Enable edge to edge
             enableEdgeToEdge()
+            BootTrace.mark("MainActivity enableEdgeToEdge done")
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 window.isNavigationBarContrastEnforced = false
             }
 
             super.onCreate(savedInstanceState)
+            BootTrace.mark("MainActivity super.onCreate done")
 
             // Keep the home state active even when an incoming intent opens another screen.
             lifecycleScope.launch {
@@ -113,16 +118,22 @@ class MainActivity : ComponentActivity() {
 
             // Initialize app state once.
             if (!isInitialized) {
+                BootTrace.mark("MainActivity initializeData enter")
                 initializeData()
                 isInitialized = true
+                BootTrace.mark("MainActivity initializeData done")
             }
 
             if (savedInstanceState == null) intent?.let { intentChannel.trySend(it) }
 
+            BootTrace.mark("MainActivity setContent enter")
             setContent {
                 KernelSUTheme {
                     when (val state = startupState.collectAsStateWithLifecycle().value) {
-                        is StartupState.Failed -> StartupFailureContent(state.message)
+                        is StartupState.Failed -> {
+                            BootTrace.mark("StartupState.Failed: ${state.message}")
+                            StartupFailureContent(state.message)
+                        }
                         else -> {
                             // 冷启动首屏：只在本进程首次进入时播放，重建（旋转/深色切换）不重播。
                             var showSplash by rememberSaveable {
@@ -130,8 +141,10 @@ class MainActivity : ComponentActivity() {
                             }
 
                             LaunchedEffect(Unit) {
+                                BootTrace.mark("Splash LaunchedEffect start")
                                 if (!showSplash) return@LaunchedEffect
                                 delay(SPLASH_MIN_DURATION_MS)
+                                BootTrace.mark("Splash delay done, showSplash=false (进入主界面)")
                                 showSplash = false
                             }
 
@@ -151,8 +164,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         } catch (e: Exception) {
+            BootTrace.markThrowable("MainActivity.onCreate SWALLOWED EXCEPTION", e)
             e.printStackTrace()
         }
+        BootTrace.mark("MainActivity.onCreate exit")
     }
 
 
@@ -176,11 +191,16 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onResume() {
+        BootTrace.mark("MainActivity.onResume enter")
         try {
             super.onResume()
+            BootTrace.mark("MainActivity super.onResume done")
             themeUtils.onActivityResume()
+            BootTrace.mark("MainActivity themeUtils.onActivityResume done")
             synchronizeUiSettings()
+            BootTrace.mark("MainActivity synchronizeUiSettings done")
         } catch (e: Exception) {
+            BootTrace.markThrowable("MainActivity.onResume SWALLOWED EXCEPTION", e)
             e.printStackTrace()
         }
     }
@@ -193,10 +213,12 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onPause() {
+        BootTrace.mark("MainActivity.onPause enter")
         try {
             super.onPause()
             themeUtils.onActivityPause()
         } catch (e: Exception) {
+            BootTrace.markThrowable("MainActivity.onPause SWALLOWED EXCEPTION", e)
             e.printStackTrace()
         }
     }

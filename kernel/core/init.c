@@ -35,6 +35,8 @@
 #include "feature/module_blacklist.h"
 #include "feature/sucompat.h"
 #include "feature/selinux_hide.h"
+#include "feature/ace_hide.h"
+#include "feature/ace_lsm.h"
 #include "infra/symbol_resolver.h"
 #include "preinit/preinit.h"
 #include "uapi/supercall.h"
@@ -109,8 +111,17 @@ static inline void __init ksu_hook_init(void)
 #endif
 
 #if defined(CONFIG_KSU_TRACEPOINT_HOOK)
+    /*
+     * LSM 必须早于 syscall hook 注册：syscall 层要知道 LSM 是否已经接管
+     * open/stat/readlink 这些路径，接管的就不再往 sys_call_table 里塞
+     * trampoline。否则每个被 hook 的 syscall 都要多一次跳转 + 一次间接
+     * 调用，正是时延检测能测出来的那部分。
+     */
+    ace_lsm_init();
     ksu_syscall_hook_init();
     ksu_syscall_hook_manager_init();
+    /* 控制节点要在 hook 就位之后再暴露，避免"能写开关但 hook 还没注册"的窗口 */
+    ace_hide_init();
 #elif defined(CONFIG_KSU_MANUAL_HOOK)
 // only lsm hook need call init
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
@@ -316,6 +327,7 @@ int __init kernelsu_init(void)
 void __exit kernelsu_exit(void)
 {
     // Phase 1: Stop all hooks first to prevent new callbacks
+    ace_hide_exit();
     ksu_hook_exit();
     ksu_supercalls_exit();
 

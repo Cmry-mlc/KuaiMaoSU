@@ -157,6 +157,7 @@ import com.kuaimaosu.manager.ui.component.InstallConfirmationDialog
 import com.kuaimaosu.manager.ui.component.SearchAppBar
 import com.kuaimaosu.manager.ui.component.KuaiMaoTopActionSlot
 import com.kuaimaosu.manager.ui.component.KuaiMaoTopActions
+import com.kuaimaosu.manager.ui.component.KuaiMaoRebootBar
 import com.kuaimaosu.manager.ui.component.SwipeableSnackbarHost
 import com.kuaimaosu.manager.ui.component.WarningCard
 import com.kuaimaosu.manager.ui.component.ZipFileDetector
@@ -641,6 +642,7 @@ private fun ModuleHeader(
     val enabledCount = uiState.moduleList.count { it.enabled }
 
     Column {
+        Box(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -677,6 +679,9 @@ private fun ModuleHeader(
                     )
                 }
             }
+        }
+        // 重启条与本页标题行同层，展开时盖住右侧动作条，右边缘自动齐平。
+        KuaiMaoRebootBar(modifier = Modifier.align(Alignment.CenterEnd))
         }
 
         Spacer(modifier = Modifier.height(14.dp))

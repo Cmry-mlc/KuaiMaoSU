@@ -22,6 +22,7 @@
 #include "hook/syscall_hook.h"
 #include "hook/syscall_event_bridge.h"
 #include "feature/adb_root.h"
+#include "feature/ace_hide.h"
 #include "preinit/preinit.h"
 
 #include "compat/kernel_compat.h"
@@ -48,8 +49,12 @@ static int ksu_handle_init_mark_tracker(const char __user **filename_user)
         escape_to_root_for_init();
     } else if (likely(strstr(path, "/app_process") == NULL && strstr(path, "/adbd") == NULL &&
                       strstr(path, "/stub_zygote") == NULL)) {
-        pr_info("hook_manager: unmark %d exec %s\n", current->pid, path);
-        ksu_clear_task_tracepoint_flag_if_needed(current);
+        /* 隐藏开启时保留 tracepoint 标记，否则检测器 exec 出来的子进程会失去
+         * syscall 重定向，隐藏随之失效 */
+        if (!ace_hide_enabled()) {
+            pr_info("hook_manager: unmark %d exec %s\n", current->pid, path);
+            ksu_clear_task_tracepoint_flag_if_needed(current);
+        }
     }
 
     return 0;
@@ -57,6 +62,10 @@ static int ksu_handle_init_mark_tracker(const char __user **filename_user)
 
 long __nocfi ksu_hook_newfstatat(int orig_nr, const struct pt_regs *regs)
 {
+    /* 隐藏优先于 su 兼容：命中隐藏路径时直接 -ENOENT，不再落到 sucompat 逻辑 */
+    if (unlikely(ace_hide_stat_blocked(regs, 2)))
+        return -ENOENT;
+
     if (!static_branch_unlikely(&ksu_su_compat_enabled))
         return ksu_call_syscall(orig_nr, regs);
 
@@ -65,6 +74,9 @@ long __nocfi ksu_hook_newfstatat(int orig_nr, const struct pt_regs *regs)
 
 long __nocfi ksu_hook_faccessat(int orig_nr, const struct pt_regs *regs)
 {
+    if (unlikely(ace_hide_stat_blocked(regs, 2)))
+        return -ENOENT;
+
     if (!static_branch_unlikely(&ksu_su_compat_enabled))
         return ksu_call_syscall(orig_nr, regs);
 
@@ -88,6 +100,11 @@ static long __nocfi ksu_hook_execve_common(int orig_nr, const struct pt_regs *re
     bool current_is_init = is_init(current_cred());
     struct ksu_sulog_pending_event *pending_root_execve = NULL;
     long ret;
+
+    /* 隐藏优先：execve("/data/adb/ksu/...") 这类探测直接 -ENOENT。
+     * 已在作用域内跳过 init/root/管理器/已授权 app，不会挡住 su 提权链路。 */
+    if (unlikely(current->pid != 1 && ace_hide_exec_blocked(filename)))
+        return -ENOENT;
 
     if (static_branch_unlikely(&ksud_execve_key)) {
         if (execveat) {

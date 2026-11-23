@@ -1,5 +1,7 @@
 package com.kuaimaosu.manager.ui.screen.susfs.subpages
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.twotone.Folder
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +28,7 @@ import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.launch
 import com.kuaimaosu.manager.R
 import com.kuaimaosu.manager.ui.component.settings.SettingsJumpPageWidget
+import com.kuaimaosu.manager.ui.screen.susfs.component.SusfsEntryRow
 import com.kuaimaosu.manager.ui.component.settings.SettingsTextFieldWidget
 import com.kuaimaosu.manager.ui.screen.susfs.RegisterSuSFSRefresh
 import com.kuaimaosu.manager.ui.screen.susfs.SuSFSRefreshRegistrar
@@ -115,9 +118,10 @@ fun SusMapTab(
             entryKey = { it },
             onAddEntry = { showManualAdd = true },
         ) { path ->
-            SettingsJumpPageWidget(
-                iconPlaceholder = false,
+            SusfsEntryRow(
                 title = path,
+                icon = Icons.TwoTone.Folder,
+                description = "SUS_MAP · inode 面",
                 onClick = { detailItem = path },
             )
         }

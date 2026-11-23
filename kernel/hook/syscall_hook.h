@@ -90,4 +90,15 @@ void ksu_compat_syscall_table_unhook(int nr);
 void ksu_syscall_hook_init(void);
 void ksu_syscall_hook_exit(void);
 
+#ifdef __aarch64__
+/*
+ * 注册阶段结束后调用一次：决定用 direct（逐条改表）还是 shared（共享
+ * dispatcher + sys_enter tracepoint）。direct 成功时未 hook 的 syscall
+ * 完全不走 tracepoint，热路径零额外开销。
+ */
+void ksu_syscall_hook_finalize(void);
+bool ksu_syscall_hook_is_direct(void);
+int ksu_syscall_hook_count(void);
+#endif
+
 #endif

@@ -15,12 +15,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.twotone.BugReport
+import androidx.compose.material.icons.twotone.ChevronRight
 import androidx.compose.material.icons.twotone.Code
 import androidx.compose.material.icons.twotone.Computer
 import androidx.compose.material.icons.twotone.Security
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.twotone.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
@@ -50,9 +54,13 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import com.kuaimaosu.manager.R
 import com.kuaimaosu.manager.domain.model.SuSFSSlotInfo
+import com.kuaimaosu.manager.ui.component.KuaiMaoRow
+import com.kuaimaosu.manager.ui.component.KuaiMaoRowDivider
+import com.kuaimaosu.manager.ui.component.KuaiMaoSwitch
 import com.kuaimaosu.manager.ui.component.settings.SegmentedColumn
 import com.kuaimaosu.manager.ui.component.settings.SettingsBaseWidget
 import com.kuaimaosu.manager.ui.component.settings.SettingsJumpPageWidget
@@ -61,6 +69,11 @@ import com.kuaimaosu.manager.ui.component.settings.SettingsTextFieldWidget
 import com.kuaimaosu.manager.ui.component.settings.lazySegmentColumn
 import com.kuaimaosu.manager.ui.screen.susfs.RegisterSuSFSRefresh
 import com.kuaimaosu.manager.ui.screen.susfs.SuSFSRefreshRegistrar
+import com.kuaimaosu.manager.ui.screen.susfs.component.SusfsGroupCard
+import com.kuaimaosu.manager.ui.screen.susfs.component.SusfsHero
+import com.kuaimaosu.manager.ui.screen.susfs.component.SusfsMetric
+import com.kuaimaosu.manager.ui.screen.susfs.component.SusfsSectionLabel
+import com.kuaimaosu.manager.ui.theme.KuaiMaoColors
 import com.kuaimaosu.manager.ui.util.LocalSnackbarHost
 import com.kuaimaosu.manager.ui.util.showReplacingSnackbar
 import com.kuaimaosu.manager.ui.viewmodel.SuSFSUiAction
@@ -256,85 +269,148 @@ fun StandardFeaturesTab(
         }
     }
 
+    val enabledCount = listOf(loggingEnabled, avcLogSpoofingEnabled, hideSusMntsEnabled).count { it }
+    val anyEnabled = enabledCount > 0
+
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .nestedScroll(nestedScrollConnection),
+            contentPadding = PaddingValues(horizontal = 20.dp),
         ) {
             item {
-                Spacer(Modifier.height(innerPadding.calculateTopPadding()))
+                Spacer(Modifier.height(innerPadding.calculateTopPadding() + 10.dp))
             }
 
             if (hasLoadedConfig) {
                 item {
-                    SegmentedColumn {
-                        item {
-                            SettingsSwitchWidget(
-                                icon = Icons.TwoTone.BugReport,
-                                title = stringResource(R.string.susfs_standard_logging),
-                                description = stringResource(R.string.susfs_standard_logging_desc),
-                                checked = loggingEnabled,
-                                onCheckedChange = handleLoggingChange,
-                            )
-                        }
+                    SusfsHero(
+                        eyebrow = stringResource(R.string.susfs_general_eyebrow),
+                        stateLabel = stringResource(
+                            if (anyEnabled) {
+                                R.string.susfs_general_state_on
+                            } else {
+                                R.string.susfs_general_state_off
+                            },
+                        ),
+                        accent = if (anyEnabled) Color(0xFF4FD6A0) else Color(0xFF8A8A92),
+                        badge = "$enabledCount / 3",
+                        metrics = listOf(
+                            SusfsMetric("LOG", if (loggingEnabled) "ON" else "OFF", loggingEnabled),
+                            SusfsMetric("AVC", if (avcLogSpoofingEnabled) "ON" else "OFF", avcLogSpoofingEnabled),
+                            SusfsMetric("MOUNT", if (hideSusMntsEnabled) "ON" else "OFF", hideSusMntsEnabled),
+                        ),
+                    )
+                }
 
-                        item {
-                            SettingsSwitchWidget(
-                                icon = Icons.TwoTone.Security,
-                                title = stringResource(R.string.susfs_standard_avc_log_spoofing),
-                                description = stringResource(R.string.susfs_standard_avc_log_spoofing_desc),
-                                checked = avcLogSpoofingEnabled,
-                                onCheckedChange = handleAvcLogSpoofingChange,
-                            )
-                        }
-
-                        item {
-                            SettingsSwitchWidget(
-                                icon = Icons.TwoTone.VisibilityOff,
-                                title = stringResource(R.string.susfs_standard_hide_sus_mnts),
-                                description = stringResource(R.string.susfs_standard_hide_sus_mnts_desc),
-                                checked = hideSusMntsEnabled,
-                                onCheckedChange = handleHideSusMntsChange,
-                            )
-                        }
-
-                        item {
-                            SettingsJumpPageWidget(
-                                icon = Icons.TwoTone.Computer,
-                                title = stringResource(R.string.susfs_standard_uname),
-                                description = stringResource(
-                                    R.string.susfs_standard_current_value,
-                                    "$unameRelease / $unameVersion",
-                                ),
-                                onClick = {
-                                    unameReleaseInput.setTextAndPlaceCursorAtEnd(unameRelease)
-                                    unameVersionInput.setTextAndPlaceCursorAtEnd(unameVersion)
-                                    unameDialogTab = UnameDialogTab.Manual
-                                    slotInfos = null
-                                    selectedSlotName = null
-                                    isSlotInfoLoading = false
-                                    slotInfoLoadFailed = false
-                                    showUnameDialog = true
-                                },
-                            )
-                        }
-
-                        item {
-                            SettingsJumpPageWidget(
-                                icon = Icons.TwoTone.Code,
-                                title = stringResource(R.string.susfs_standard_cmdline_or_bootconfig),
-                                description = stringResource(
-                                    R.string.susfs_standard_current_value,
-                                    cmdlineOrBootconfig.ifBlank { stringResource(R.string.susfs_standard_not_set) },
-                                ),
-                                onClick = {
-                                    cmdlineInput.setTextAndPlaceCursorAtEnd(cmdlineOrBootconfig)
-                                    showCmdlineDialog = true
-                                },
-                            )
-                        }
+                item {
+                    SusfsSectionLabel(
+                        title = stringResource(R.string.susfs_general_group_audit),
+                        note = stringResource(R.string.susfs_general_note_debug),
+                    )
+                }
+                item {
+                    SusfsGroupCard {
+                        KuaiMaoRow(
+                            icon = Icons.TwoTone.BugReport,
+                            title = stringResource(R.string.susfs_standard_logging),
+                            description = stringResource(R.string.susfs_standard_logging_desc),
+                            trailing = {
+                                KuaiMaoSwitch(
+                                    checked = loggingEnabled,
+                                    onCheckedChange = handleLoggingChange,
+                                )
+                            },
+                        )
+                        KuaiMaoRowDivider()
+                        KuaiMaoRow(
+                            icon = Icons.TwoTone.Security,
+                            title = stringResource(R.string.susfs_standard_avc_log_spoofing),
+                            description = stringResource(R.string.susfs_standard_avc_log_spoofing_desc),
+                            trailing = {
+                                KuaiMaoSwitch(
+                                    checked = avcLogSpoofingEnabled,
+                                    onCheckedChange = handleAvcLogSpoofingChange,
+                                )
+                            },
+                        )
                     }
+                }
+
+                item {
+                    SusfsSectionLabel(title = stringResource(R.string.susfs_general_group_mount))
+                }
+                item {
+                    SusfsGroupCard {
+                        KuaiMaoRow(
+                            icon = Icons.TwoTone.VisibilityOff,
+                            title = stringResource(R.string.susfs_standard_hide_sus_mnts),
+                            description = stringResource(R.string.susfs_standard_hide_sus_mnts_desc),
+                            trailing = {
+                                KuaiMaoSwitch(
+                                    checked = hideSusMntsEnabled,
+                                    onCheckedChange = handleHideSusMntsChange,
+                                )
+                            },
+                        )
+                    }
+                }
+
+                item {
+                    SusfsSectionLabel(
+                        title = stringResource(R.string.susfs_general_group_identity),
+                        note = stringResource(R.string.susfs_general_note_persist),
+                    )
+                }
+                item {
+                    SusfsGroupCard {
+                        KuaiMaoRow(
+                            icon = Icons.TwoTone.Computer,
+                            title = stringResource(R.string.susfs_standard_uname),
+                            description = stringResource(
+                                R.string.susfs_standard_current_value,
+                                "$unameRelease / $unameVersion",
+                            ),
+                            onClick = {
+                                unameReleaseInput.setTextAndPlaceCursorAtEnd(unameRelease)
+                                unameVersionInput.setTextAndPlaceCursorAtEnd(unameVersion)
+                                unameDialogTab = UnameDialogTab.Manual
+                                slotInfos = null
+                                selectedSlotName = null
+                                isSlotInfoLoading = false
+                                slotInfoLoadFailed = false
+                                showUnameDialog = true
+                            },
+                            trailing = { RowChevron() },
+                        )
+                        KuaiMaoRowDivider()
+                        KuaiMaoRow(
+                            icon = Icons.TwoTone.Code,
+                            title = stringResource(R.string.susfs_standard_cmdline_or_bootconfig),
+                            description = stringResource(
+                                R.string.susfs_standard_current_value,
+                                cmdlineOrBootconfig.ifBlank {
+                                    stringResource(R.string.susfs_standard_not_set)
+                                },
+                            ),
+                            onClick = {
+                                cmdlineInput.setTextAndPlaceCursorAtEnd(cmdlineOrBootconfig)
+                                showCmdlineDialog = true
+                            },
+                            trailing = { RowChevron() },
+                        )
+                    }
+                }
+
+                item {
+                    Text(
+                        text = stringResource(R.string.susfs_general_footer),
+                        fontSize = 10.sp,
+                        lineHeight = 15.sp,
+                        color = KuaiMaoColors.textMuted,
+                        modifier = Modifier.padding(top = 14.dp, start = 4.dp, end = 4.dp),
+                    )
                 }
             }
 
@@ -553,4 +629,15 @@ fun StandardFeaturesTab(
             )
         }
     }
+}
+
+/** 跳转行的右侧箭头：统一尺寸与颜色，避免每处各写一遍 */
+@Composable
+private fun RowChevron() {
+    Icon(
+        imageVector = Icons.TwoTone.ChevronRight,
+        contentDescription = null,
+        tint = KuaiMaoColors.textDisabled,
+        modifier = Modifier.size(18.dp),
+    )
 }

@@ -55,6 +55,27 @@ impl Config {
         self
     }
 
+    pub fn has_sus_path(&self, path: &str) -> bool {
+        self.sus_path.iter().any(|item| item.path == path)
+    }
+
+    /// 删除所有“管理器 apk 自动注册”产生的 sus_path 条目，**包含当前路径**。
+    ///
+    /// 为什么不保留当前路径：本构建内核 `ignore_ksu_allowlist = true`
+    /// （见 ksu_umount_gate.c），对 uid >= 10000 的进程全量隐藏，管理器进程
+    /// 打开自己的 base.apk 会在 `inode_permission` 被判 -ENOENT，进程在
+    /// `Application.onCreate` 之前就死掉——表现为开机必闪退、重装即恢复。
+    /// 因此按“路径含管理器包名且以 base.apk 结尾”识别并全部清掉，
+    /// 不碰用户手动添加的其它 sus_path。返回被清理的条数。
+    pub fn prune_manager_apks(&mut self) -> usize {
+        let pkg = crate::defs::DEFAULT_PACKAGE_NAME;
+        let before = self.sus_path.len();
+        self.sus_path.retain(|item| {
+            !(item.path.contains(pkg) && item.path.ends_with("base.apk"))
+        });
+        before - self.sus_path.len()
+    }
+
     pub fn add_sus_kstat(&mut self, path: &str, full_clone: bool) -> Result<&mut Self> {
         ensure_path_exists!(path);
         self.sus_kstat.replace(SusKstatItem {

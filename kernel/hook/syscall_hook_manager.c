@@ -23,6 +23,7 @@
 #include "hook/setuid_hook.h"
 #include "hook/syscall_hook.h"
 #include "hook/syscall_event_bridge.h"
+#include "feature/ace_hide.h"
 #if defined(__riscv)
 #include "hook/riscv64/syscall_regs.h"
 #endif
@@ -172,6 +173,35 @@ void __init ksu_syscall_hook_manager_init(void)
     ksu_register_syscall_hook(__NR_newfstatat, ksu_hook_newfstatat);
     ksu_register_syscall_hook(__NR_faccessat, ksu_hook_faccessat);
 
+    /*
+     * 隐藏的入口分两类：
+     *
+     *   路径类（openat/openat2/statx/faccessat2/readlinkat）
+     *     LSM 的 inode_permission / inode_getattr / inode_readlink 已经在
+     *     内核自己的 path walk 里把 (dev,ino) 判掉了，不需要再往
+     *     sys_call_table 里塞 trampoline。每少一个 hook，对应的 syscall
+     *     就少一次跳转 + 一次间接调用 —— syscall 时延检测测的正是这个。
+     *
+     *   内容类（getdents64 / read）
+     *     LSM 覆盖不到目录项列举和文件内容，只能留在 syscall 层。
+     */
+    ksu_register_syscall_hook(__NR_getdents64, ace_hook_getdents64);
+    ksu_register_syscall_hook(__NR_read, ace_hook_read);
+
+    if (!ace_lsm_ready_for_paths()) {
+        pr_warn("hook_manager: LSM unavailable, fall back to syscall path hooks\n");
+        ksu_register_syscall_hook(__NR_openat, ace_hook_openat);
+#ifdef __NR_openat2
+        ksu_register_syscall_hook(__NR_openat2, ace_hook_openat2);
+#endif
+#ifdef __NR_statx
+        ksu_register_syscall_hook(__NR_statx, ace_hook_statx);
+#endif
+#ifdef __NR_faccessat2
+        ksu_register_syscall_hook(__NR_faccessat2, ace_hook_faccessat2);
+#endif
+    }
+
 #if defined(CONFIG_COMPAT) && defined(__aarch64__)
     ksu_register_compat_syscall_hook(ksu_get_compat_syscall_no(setresuid32), ksu_hook_setresuid);
     ksu_register_compat_syscall_hook(ksu_get_compat_syscall_no(execve), ksu_hook_execve);
@@ -180,7 +210,20 @@ void __init ksu_syscall_hook_manager_init(void)
     ksu_register_compat_syscall_hook(ksu_get_compat_syscall_no(faccessat), ksu_hook_faccessat);
 #endif
 
+#ifdef __aarch64__
+    /*
+     * 所有 hook 已登记，现在决定分发方式。
+     * direct 模式下不再注册 sys_enter tracepoint——tracepoint 一旦有人注册，
+     * 内核的 static key 就永久打开，每个 syscall 平白多一次 trace 入口，
+     * 这正是「syscall 时延」类侧信道检测能测出来的差异。
+     */
+    ksu_syscall_hook_finalize();
+#endif
+
 #ifdef CONFIG_HAVE_SYSCALL_TRACEPOINTS
+#ifdef __aarch64__
+    if (!ksu_syscall_hook_is_direct()) {
+#endif
     ret = register_trace_prio_sys_enter(ksu_sys_enter_handler, NULL, INT_MIN);
 #ifndef CONFIG_KRETPROBES
     ksu_mark_running_process_locked();
@@ -190,6 +233,11 @@ void __init ksu_syscall_hook_manager_init(void)
     } else {
         pr_info("hook_manager: sys_enter tracepoint registered\n");
     }
+#ifdef __aarch64__
+    } else {
+        pr_info("hook_manager: direct mode, tracepoint skipped\n");
+    }
+#endif
 #endif
 
     ksu_setuid_hook_init();
@@ -215,6 +263,20 @@ void __exit ksu_syscall_hook_manager_exit(void)
     ksu_unregister_syscall_hook(__NR_execveat);
     ksu_unregister_syscall_hook(__NR_newfstatat);
     ksu_unregister_syscall_hook(__NR_faccessat);
+
+    ksu_unregister_syscall_hook(__NR_getdents64);
+    ksu_unregister_syscall_hook(__NR_openat);
+#ifdef __NR_openat2
+    ksu_unregister_syscall_hook(__NR_openat2);
+#endif
+#ifdef __NR_statx
+    ksu_unregister_syscall_hook(__NR_statx);
+#endif
+#ifdef __NR_faccessat2
+    ksu_unregister_syscall_hook(__NR_faccessat2);
+#endif
+    ksu_unregister_syscall_hook(__NR_readlinkat);
+    ksu_unregister_syscall_hook(__NR_read);
 
 #if defined(CONFIG_COMPAT) && defined(__aarch64__)
     ksu_unregister_compat_syscall_hook(ksu_get_compat_syscall_no(setresuid32));

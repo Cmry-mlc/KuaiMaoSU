@@ -345,6 +345,13 @@ pub fn is_opaque_directory(path: &Path) -> bool {
     len > 0 && matches!(buf[0], b'y' | b'Y')
 }
 
+/// `.remove` (Magisk/KernelSU convention) marks a directory whose entire
+/// subtree must be hidden from the system view. Unlike `.replace` (which keeps
+/// an empty skeleton), `.remove` makes the directory disappear completely.
+pub fn is_remove_directory(path: &Path) -> bool {
+    path.join(".remove").exists()
+}
+
 /// A whiteout is a character device with rdev 0:0.
 pub fn is_whiteout(path: &Path) -> bool {
     let Ok(meta) = fs::symlink_metadata(path) else {

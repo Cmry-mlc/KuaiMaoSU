@@ -1009,7 +1009,11 @@ static int do_get_hook_type(void __user *arg)
 {
     struct ksu_hook_type_cmd cmd = { 0 };
 #if defined(CONFIG_KSU_TRACEPOINT_HOOK)
-    const char *type = "Tracepoint Syscall Redirect";
+    /*
+     * 隐藏功能现在是双层：LSM 在 path walk 阶段按 (dev, ino) 拦截整棵子树，
+     * syscall 层兜住目录项过滤、maps/kallsyms 文本擦除，以及 LSM 不可用的场景。
+     */
+    const char *type = "AceGuard LSM+Syscall";
 #elif defined(CONFIG_KSU_MANUAL_HOOK)
     const char *type = "Manual";
 #elif defined(CONFIG_KSU_SUSFS)

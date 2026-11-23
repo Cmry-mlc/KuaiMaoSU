@@ -48,7 +48,19 @@ impl Config {
     }
 
     pub fn apply_sus_path(&self) -> Result<&Self> {
-        apply_multiply(&self.sus_path, |i| api::add_sus_path(&i.path, i.is_loop)).map(|_| self)
+        let pkg = crate::defs::DEFAULT_PACKAGE_NAME;
+        apply_multiply(&self.sus_path, |i| {
+            // 硬保险：管理器自己的 base.apk 绝不能下发给 SUSFS。本构建内核
+            // `ignore_ksu_allowlist = true`，对 uid >= 10000 全量隐藏，管理器
+            // 打开自己的 apk 会被 inode_permission 判 -ENOENT，进程在
+            // Application.onCreate 之前就死掉。无论配置里为何残留，这里都跳过。
+            if i.path.contains(pkg) && i.path.ends_with("base.apk") {
+                log::warn!("skip applying manager own apk to sus_path: {}", i.path);
+                return Ok(());
+            }
+            api::add_sus_path(&i.path, i.is_loop)
+        })
+        .map(|_| self)
     }
 
     pub fn init_sus_kstat(&self) -> Result<&Self> {

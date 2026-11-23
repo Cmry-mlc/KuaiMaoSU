@@ -29,3 +29,7 @@ key.jks
 /userspace/ksud/.lkm_image_bootstrap.o
 *.o
 *.ko
+
+# 内核构建系统在源码树里生成的本地工具与命令文件
+kernel/tools/code_generation/syscall_no/syscall_no
+kernel/tools/code_generation/syscall_no/.syscall_no.cmd

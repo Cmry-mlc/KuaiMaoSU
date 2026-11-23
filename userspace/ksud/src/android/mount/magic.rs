@@ -37,6 +37,8 @@ struct Node {
     module_path: PathBuf,
     /// `.replace` / `trusted.overlay.opaque`：丢弃下层与 stock 内容
     replace: bool,
+    /// `.remove`：整棵子树从系统视图里消失（不只是清空，连同目录本身）
+    remove: bool,
 }
 
 impl Node {
@@ -46,6 +48,7 @@ impl Node {
             children: BTreeMap::new(),
             module_path: PathBuf::new(),
             replace: false,
+            remove: false,
         }
     }
 }
@@ -96,7 +99,7 @@ fn collect_into(
     let mut has = false;
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
-        if name == ".replace" {
+        if name == ".replace" || name == ".remove" {
             continue;
         }
         let mut path = entry.path();
@@ -114,10 +117,20 @@ fn collect_into(
             kind = NodeType::Directory;
         }
         let replace = kind == NodeType::Directory && fsutil::is_opaque_directory(&path);
+        let remove = kind == NodeType::Directory && fsutil::is_remove_directory(&path);
 
         match parent.children.get_mut(&name) {
             Some(existing) => {
-                if existing.kind == NodeType::Directory && !existing.replace && kind == NodeType::Directory
+                // `.remove` 与 `.replace` 是节点级标记，后出现的模块也要能覆盖：
+                // 标记沿合并链传播，且被 remove 的目录不再收集子树。
+                if kind == NodeType::Directory {
+                    existing.remove |= remove;
+                    existing.replace |= replace;
+                }
+                if existing.kind == NodeType::Directory
+                    && !existing.remove
+                    && !existing.replace
+                    && kind == NodeType::Directory
                 {
                     collect_into(existing, &path, module_root, partitions)?;
                 }
@@ -128,8 +141,9 @@ fn collect_into(
                     children: BTreeMap::new(),
                     module_path: path.clone(),
                     replace,
+                    remove,
                 };
-                if kind == NodeType::Directory {
+                if kind == NodeType::Directory && !remove {
                     collect_into(&mut node, &path, module_root, partitions)?;
                 }
                 parent.children.insert(name, node);
@@ -318,6 +332,13 @@ fn mount_directory(
     has_tmpfs: bool,
     walk: &mut Walk,
 ) -> Result<()> {
+    // `.remove`：整棵子树从系统视图消失。父目录已经为它建了 tmpfs skeleton，
+    // 这里什么都不创建（也不 mirror），原先真实存在的目录就被掩盖掉。
+    if node.remove {
+        debug!("magic: remove subtree {}", real.display());
+        return Ok(());
+    }
+
     let real_is_dir = fs::symlink_metadata(real)
         .map(|m| m.is_dir())
         .unwrap_or(false);
@@ -333,6 +354,10 @@ fn mount_directory(
                 NodeType::Symlink => true,
                 NodeType::Regular => !real_child.is_file(),
                 NodeType::Whiteout => fs::symlink_metadata(&real_child).is_ok(),
+                NodeType::Directory if child.remove => {
+                    // remove 需要 skeleton 把整棵子树遮掉，只要真实路径存在就触发
+                    fs::symlink_metadata(&real_child).is_ok()
+                }
                 NodeType::Directory => !fs::symlink_metadata(&real_child)
                     .map(|m| m.is_dir())
                     .unwrap_or(false),

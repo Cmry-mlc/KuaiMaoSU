@@ -105,3 +105,33 @@ org.gradle.configuration-cache=true
 | `jniLibs/arm64-v8a/libkmplant.so` | 静态链接的 plant 可执行（写原语核心） |
 | `jniLibs/arm64-v8a/libksud.so` | late-load 用的 ksud |
 | `assets/KuaiMaoroot/kernel_profiles.txt` | 内核偏移表，按 `uname -r` 精确匹配 |
+
+## 十、改内核模块后怎么出包（唯一正确路径）
+
+`susfs_guard_lkm.ko` **不是** APK 里的独立文件。链路是：
+
+```
+susfs-out/<kmi>_susfs_guard_lkm.ko
+  → userspace/ksud/bin/aarch64/<kmi>_susfs_guard_lkm.ko   (rust-embed 资源)
+  → cargo build --target aarch64-linux-android --release   (编译期压缩嵌入 ksud)
+  → manager/app/src/main/jniLibs/arm64-v8a/libdove.so     (ksud 改名)
+  → gradlew :app:assembleRelease
+```
+
+只替换裸 `.ko`、或只重打 APK，设备上跑的都还是旧模块。
+
+一条命令搞定：
+
+```bash
+scripts/release-apk.sh                    # 默认 android15-6.6，版本号自动 +1
+scripts/release-apk.sh android15-6.6 4.3.5 40305
+KO=/path/to/other.ko scripts/release-apk.sh android15-6.6
+```
+
+脚本做了三件容易漏的事：
+
+1. **删 ksud 的 fingerprint 再编**。`rust-embed` 的 `compression` 在编译期压缩资源，缓存命中会沿用旧字节，源码注释里也写着 “must clean build after updating binaries”。
+2. **验证 ko 真的换了**。换 ko 重编后 `ksud` 体积必须变化（实测：旧 ko 8,493,240 / 新 ko 8,498,744，差 5,504 字节）。不变就是没编进去。
+3. **提版本号 + 同签名出包**，产物直接落到 `/workspace` 并打印 md5。
+
+装到设备后**必须重载 LKM**（`ksud lkm unload; ksud lkm load`，或在管理器里关一次再开），否则内存里还是旧模块。

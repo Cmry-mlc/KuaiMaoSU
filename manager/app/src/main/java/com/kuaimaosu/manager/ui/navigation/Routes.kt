@@ -207,7 +207,7 @@ sealed interface Route :
     @Serializable
     data object SuSFSLkm : Route
 
-    /** eBPF 控制台：raw_syscalls hook getdents64 目录项隐藏。 */
+    /** 内核隐藏控制台：规则下发到 kernelsu.ko 内的 syscall hook。 */
     @Parcelize
     @Serializable
     data object AceHide : Route
@@ -216,11 +216,6 @@ sealed interface Route :
     @Parcelize
     @Serializable
     data object MountController : Route
-
-    /** 内置 Zygisk 引擎（FolkZygisk）：状态与开关。 */
-    @Parcelize
-    @Serializable
-    data object ZygiskEngine : Route
 
     /** 一键越狱：自研 98260 引擎的临时提权。 */
     @Parcelize

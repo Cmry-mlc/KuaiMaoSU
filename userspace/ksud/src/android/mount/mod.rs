@@ -381,13 +381,14 @@ fn boot_completed() -> bool {
 
 pub fn apply(force: bool) -> Result<ApplyReport> {
     let config = Config::load();
-    let mut report = ApplyReport::default();
 
     if !config.enabled {
+        let mut report = ApplyReport::default();
         report.detail = "mount controller disabled".to_string();
         return Ok(report);
     }
     if metamodule::has_metamodule() && !force {
+        let mut report = ApplyReport::default();
         report.detail = "metamodule installed; built-in mount controller stays out of the way"
             .to_string();
         info!("{}", report.detail);
@@ -413,13 +414,50 @@ pub fn apply(force: bool) -> Result<ApplyReport> {
     }
     write_boot_attempts(attempts + 1);
 
-    let modules = enumerate_modules(&config);
+    perform_mount(&config)
+}
+
+/// 免解（late-load）场景下的内置挂载入口。
+///
+/// 免解是系统启动完成后由漏洞临时提权、late-load ko 得到的 root，天然处于
+/// `sys.boot_completed=1`，没有真正的 post-fs-data 阶段。因此这里复用同一套
+/// 挂载主体，但跳过开机专属的门槛：
+///   - 不检查 `boot_completed` / `boot_marker`（免解下必然已完成开机）；
+///   - 不写 `boot_attempts` / 不设防砖标记（重启即失效，防砖计数无意义）；
+///   - 仍然尊重“内置挂载”总开关与 metamodule 让位，和开机行为一致。
+///
+/// 这样开关开→免解也挂，开关关→免解不挂，UI 上的开关在免解下真正可用。
+pub fn apply_late_load() -> Result<ApplyReport> {
+    let config = Config::load();
+
+    if !config.enabled {
+        let mut report = ApplyReport::default();
+        report.detail = "mount controller disabled".to_string();
+        info!("{}", report.detail);
+        return Ok(report);
+    }
+    if metamodule::has_metamodule() {
+        let mut report = ApplyReport::default();
+        report.detail = "metamodule installed; built-in mount controller stays out of the way"
+            .to_string();
+        info!("{}", report.detail);
+        return Ok(report);
+    }
+
+    perform_mount(&config)
+}
+
+/// 挂载主体：枚举模块 → 分流后端 → 干净卸载 → magic/overlay 挂载 → 落状态。
+/// 由 `apply`（真开机，带门槛）和 `apply_late_load`（免解，无门槛）共用。
+fn perform_mount(config: &Config) -> Result<ApplyReport> {
+    let mut report = ApplyReport::default();
+    let modules = enumerate_modules(config);
     report.modules = modules.len();
 
     let mut overlay_modules = Vec::new();
     let mut magic_modules = Vec::new();
     for module in &modules {
-        let backend = resolve_backend(module, &config);
+        let backend = resolve_backend(module, config);
         info!("module={} backend={backend}", module.id);
         match backend {
             MODE_OVERLAY => overlay_modules.push(module.clone()),
@@ -429,11 +467,11 @@ pub fn apply(force: bool) -> Result<ApplyReport> {
     }
 
     // 从干净状态开始：先拆掉上一次（本次 boot 内重试 / 手动 apply）的挂载。
-    let _ = unmount_all(&config);
+    let _ = unmount_all(config);
 
     let mut ok = true;
     if !magic_modules.is_empty() {
-        match magic::mount_modules(&magic_modules, &config) {
+        match magic::mount_modules(&magic_modules, config) {
             Ok(count) => info!("magic mount: {} modules, {count} mounts", magic_modules.len()),
             Err(e) => {
                 warn!("magic mount failed: {e:#}");
@@ -442,7 +480,7 @@ pub fn apply(force: bool) -> Result<ApplyReport> {
         }
     }
     if !overlay_modules.is_empty() {
-        match overlay::mount_modules(&overlay_modules, &config) {
+        match overlay::mount_modules(&overlay_modules, config) {
             Ok(count) => info!(
                 "overlay mount: {} modules, {count} mounts",
                 overlay_modules.len()

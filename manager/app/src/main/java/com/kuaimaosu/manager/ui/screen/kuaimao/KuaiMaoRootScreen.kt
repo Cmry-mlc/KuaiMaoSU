@@ -33,9 +33,11 @@ import androidx.compose.material.icons.twotone.Lock
 import androidx.compose.material.icons.twotone.ManageAccounts
 import androidx.compose.material.icons.twotone.SettingsSuggest
 import androidx.compose.material.icons.twotone.Terminal
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,6 +62,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kuaimaosu.manager.data.kuaimao.KuaiMaoMgr
 import com.kuaimaosu.manager.data.kuaimao.KuaiMaoShizuku
 import com.kuaimaosu.manager.ui.component.KuaiMaoCard
 import com.kuaimaosu.manager.ui.component.KuaiMaoPrimaryButton
@@ -86,6 +89,7 @@ fun KuaiMaoRootScreen(
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
     var showDevices by remember { mutableStateOf(false) }
+    var showManagerPicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { vm.refresh() }
 
@@ -93,6 +97,17 @@ fun KuaiMaoRootScreen(
         SupportedDevicesSheet(
             currentKernel = ui.kernel,
             onDismiss = { showDevices = false },
+        )
+    }
+
+    if (showManagerPicker) {
+        ManagerPickerDialog(
+            current = ui.managerPkg,
+            onSelect = { pkg ->
+                vm.selectManager(pkg)
+                showManagerPicker = false
+            },
+            onDismiss = { showManagerPicker = false },
         )
     }
 
@@ -223,13 +238,23 @@ fun KuaiMaoRootScreen(
                     description = if (ui.managerInstalled) "已安装，late-load 用本管理器的 ksud" else "未安装（无法 late-load）",
                     iconTint = KuaiMaoTones.violet.content,
                     iconContainer = KuaiMaoTones.violet.container,
+                    onClick = { showManagerPicker = true },
                     trailing = {
-                        Text(
-                            text = ui.managerLabel,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = KuaiMaoColors.text,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = ui.managerLabel,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = KuaiMaoColors.text,
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Icon(
+                                Icons.TwoTone.ChevronRight,
+                                contentDescription = null,
+                                tint = KuaiMaoColors.chevron,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
                     },
                 )
                 KuaiMaoRowDivider()
@@ -313,6 +338,77 @@ fun KuaiMaoRootScreen(
         onLater = { vm.dismissSuccess() },
     )
     }
+}
+
+/**
+ * ROOT 管理器选择弹窗：列出已知管理器中已安装的那些，点选后写入 rootMgrPkg 偏好，
+ * 由 late-load 在下次提权时用所选管理器的 ksud 部署。
+ */
+@Composable
+private fun ManagerPickerDialog(
+    current: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val installed = KuaiMaoMgr.PKGS.filter { KuaiMaoMgr.installed(context, it) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("选择 ROOT 管理器") },
+        text = {
+            Column {
+                if (installed.isEmpty()) {
+                    Text(
+                        text = "未找到已安装的管理器",
+                        fontSize = 12.sp,
+                        color = KuaiMaoColors.textMuted,
+                        modifier = Modifier.padding(vertical = 12.dp),
+                    )
+                } else {
+                    installed.forEach { pkg ->
+                        val selected = pkg == current
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(
+                                    if (selected) KuaiMaoColors.brand.copy(alpha = 0.12f)
+                                    else Color.Transparent,
+                                )
+                                .clickable { onSelect(pkg) }
+                                .padding(horizontal = 12.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = KuaiMaoMgr.displayName(context, pkg),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = KuaiMaoColors.textBody,
+                                )
+                                Text(
+                                    text = pkg,
+                                    fontSize = 10.sp,
+                                    color = KuaiMaoColors.textMuted,
+                                )
+                            }
+                            if (selected) {
+                                Icon(
+                                    Icons.TwoTone.CheckCircle,
+                                    contentDescription = null,
+                                    tint = KuaiMaoColors.brand,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
 }
 
 @Composable
